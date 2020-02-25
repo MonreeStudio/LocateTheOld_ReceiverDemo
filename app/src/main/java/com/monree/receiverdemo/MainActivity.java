@@ -13,6 +13,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.RenderNode;
 import android.location.Location;
+import android.os.Build;
 import android.os.Bundle;
 import android.telephony.SmsManager;
 import android.telephony.SmsMessage;
@@ -36,7 +37,10 @@ public class MainActivity extends AppCompatActivity {
     IntentFilter filter;
     SmsReceiver receiver;
     String locationInfo;
+    String senderPhoneNum;
     public LocationClient mLocationClient;
+
+    boolean isSendEnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,7 +57,7 @@ public class MainActivity extends AppCompatActivity {
         filter.addAction("android.provider.Telephony.SMS_RECEIVED");
         receiver = new SmsReceiver();
         registerReceiver(receiver,filter);
-
+        //requestLocation();
         List<String> permissionList = new ArrayList<>();
         if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION)
                 !=PackageManager.PERMISSION_GRANTED){
@@ -94,7 +98,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestLocation(){
-        //initLocation();
+        initLocation();
         if(mLocationClient.isStarted())
             mLocationClient.stop();
         mLocationClient.start();
@@ -102,7 +106,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void initLocation(){
         LocationClientOption option = new LocationClientOption();
-        option.setScanSpan(5000);
+        //option.setScanSpan(5000);
+        option.setIsNeedAddress(true);
         mLocationClient.setLocOption(option);
     }
 
@@ -125,15 +130,17 @@ public class MainActivity extends AppCompatActivity {
                 for(Object object : pdus){
                     SmsMessage message = SmsMessage.createFromPdu((byte[])object,format);
                     sender = message.getOriginatingAddress();
+                    senderPhoneNum = sender;
                     content.append(message.getMessageBody());
                 }
             }
             if(content.toString().contains("1908")){
                 try{
                     requestLocation();
-                    Thread.sleep(5000);
+
+                    //while (locationTv.getText().equals("这里显示位置信息"));
                     sendSMSS(sender);
-                    Toast.makeText(MainActivity.this,"回复成功",Toast.LENGTH_SHORT).show();
+                    //Toast.makeText(MainActivity.this,"回复成功",Toast.LENGTH_SHORT).show();
                 }
                 catch (Exception e){
                     e.printStackTrace();
@@ -153,6 +160,11 @@ public class MainActivity extends AppCompatActivity {
                     StringBuilder currentPosition = new StringBuilder();
                     currentPosition.append("纬度：").append(location.getLatitude()).append("\n");
                     currentPosition.append("经度：").append(location.getLongitude()).append("\n");
+                    currentPosition.append("国家：").append(location.getCountry()).append("\n");
+                    currentPosition.append("省：").append(location.getProvince()).append("\n");
+                    currentPosition.append("市：").append(location.getCity()).append("\n");
+                    currentPosition.append("区：").append(location.getDistrict()).append("\n");
+                    currentPosition.append("街道：").append(location.getStreet()).append("\n");
                     currentPosition.append("定位方式：");
                     if(location.getLocType()==BDLocation.TypeGpsLocation){
                         currentPosition.append("GPS");
@@ -161,13 +173,15 @@ public class MainActivity extends AppCompatActivity {
                     }
                     locationInfo = currentPosition.toString();
                     locationTv.setText(currentPosition);
+
+                    isSendEnable = false;
                 }
             });
         }
     }
 
     private void sendSMSS(String phoneNumber) {
-        String content = locationInfo;
+        String content = locationTv.getText().toString();
         String phone = phoneNumber;
         if (!content.isEmpty()&&!phone.isEmpty()) {
             SmsManager manager = SmsManager.getDefault();
@@ -195,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
                             return;
                         }
                     }
-                    requestLocation();
+                    //requestLocation();
                 }
                 else {
                     Toast.makeText(this,"发生未知错误",Toast.LENGTH_SHORT).show();
