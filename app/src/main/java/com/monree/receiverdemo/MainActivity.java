@@ -13,6 +13,8 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.RenderNode;
 import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.telephony.SmsManager;
@@ -38,9 +40,9 @@ public class MainActivity extends AppCompatActivity {
     SmsReceiver receiver;
     String locationInfo;
     String senderPhoneNum;
+    Object object;
+    Context context;
     public LocationClient mLocationClient;
-
-    boolean isSendEnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,61 +52,71 @@ public class MainActivity extends AppCompatActivity {
         mLocationClient.registerLocationListener(new MyLocationListener());
 
         setContentView(R.layout.activity_main);
+        object = new Object();
+        context = getApplicationContext();
         getLocationBtn = findViewById(R.id.GetLocationButton);
         locationTv = findViewById(R.id.LocationTextView);
         locationInfo = "";
         filter = new IntentFilter();
         filter.addAction("android.provider.Telephony.SMS_RECEIVED");
         receiver = new SmsReceiver();
-        registerReceiver(receiver,filter);
+        registerReceiver(receiver, filter);
         //requestLocation();
         List<String> permissionList = new ArrayList<>();
-        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION)
-                !=PackageManager.PERMISSION_GRANTED){
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
             permissionList.add(Manifest.permission.ACCESS_FINE_LOCATION);
         }
-        if(ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.READ_PHONE_STATE)
-                !=PackageManager.PERMISSION_GRANTED){
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.READ_PHONE_STATE)
+                != PackageManager.PERMISSION_GRANTED) {
             permissionList.add(Manifest.permission.READ_PHONE_STATE);
         }
-        if(ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                !=PackageManager.PERMISSION_GRANTED){
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
             permissionList.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
         }
-        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.SEND_SMS)
-                != PackageManager.PERMISSION_GRANTED){
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.SEND_SMS)
+                != PackageManager.PERMISSION_GRANTED) {
             //ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.SEND_SMS},1);
             permissionList.add(Manifest.permission.SEND_SMS);
         }
         if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECEIVE_SMS)
-                != PackageManager.PERMISSION_GRANTED){
+                != PackageManager.PERMISSION_GRANTED) {
             //ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.RECEIVE_SMS},2);
             permissionList.add(Manifest.permission.RECEIVE_SMS);
         }
-        if(!permissionList.isEmpty()){
-            String[] permissions = permissionList.toArray(new String[permissionList.size()]);
-            ActivityCompat.requestPermissions(MainActivity.this,permissions,1);
+        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED){
+            permissionList.add(Manifest.permission.ACCESS_COARSE_LOCATION);
         }
-        else{
+        if (!permissionList.isEmpty()) {
+            String[] permissions = permissionList.toArray(new String[permissionList.size()]);
+            ActivityCompat.requestPermissions(MainActivity.this, permissions, 1);
+        } else {
 
         }
 
         getLocationBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                requestLocation();
+                List<String> list = new ArrayList<>();
+                list = getLngAndLat(context);
+                locationInfo = list.get(1)+list.get(2)+list.get(0);
+                locationTv.setText(locationInfo);
+                //requestLocation();
             }
         });
     }
 
-    private void requestLocation(){
+    private void requestLocation() {
         initLocation();
-        if(mLocationClient.isStarted())
-            mLocationClient.stop();
-        mLocationClient.start();
+        //if (mLocationClient.isStarted())
+        //    mLocationClient.stop();
+        if (!mLocationClient.isStarted())
+            mLocationClient.start();
     }
 
-    private void initLocation(){
+    private void initLocation() {
         LocationClientOption option = new LocationClientOption();
         //option.setScanSpan(5000);
         option.setIsNeedAddress(true);
@@ -115,9 +127,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         mLocationClient.stop();
+        unregisterReceiver(receiver);
     }
 
-    public class SmsReceiver extends BroadcastReceiver{
+    public class SmsReceiver extends BroadcastReceiver {
 
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -125,30 +138,122 @@ public class MainActivity extends AppCompatActivity {
             String sender = null;
             Bundle bundle = intent.getExtras();
             String format = intent.getStringExtra("format");
-            if(bundle!=null){
-                Object[] pdus = (Object[])bundle.get("pdus");
-                for(Object object : pdus){
-                    SmsMessage message = SmsMessage.createFromPdu((byte[])object,format);
+            if (bundle != null) {
+                Object[] pdus = (Object[]) bundle.get("pdus");
+                for (Object object : pdus) {
+                    SmsMessage message = SmsMessage.createFromPdu((byte[]) object, format);
                     sender = message.getOriginatingAddress();
                     senderPhoneNum = sender;
                     content.append(message.getMessageBody());
                 }
             }
-            if(content.toString().contains("1908")){
-                try{
-                    requestLocation();
-
+            if (content.toString().contains("1908")) {
+                try {
+                    List<String> list;
+                    list = getLngAndLat(context);
+                    locationInfo = list.get(1)+list.get(2)+list.get(0);
+                    locationTv.setText(locationInfo);
+                    //requestLocation();
+                    //mLocationClient.stop();
                     //while (locationTv.getText().equals("这里显示位置信息"));
+                    //Toast.makeText(MainActivity.this,locationInfo,Toast.LENGTH_SHORT).show();
                     sendSMSS(sender);
+                    //mLocationClient.stop();
                     //Toast.makeText(MainActivity.this,"回复成功",Toast.LENGTH_SHORT).show();
-                }
-                catch (Exception e){
+                } catch (Exception e) {
                     e.printStackTrace();
-                    Toast.makeText(MainActivity.this,"回复失败",Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "回复失败", Toast.LENGTH_SHORT).show();
                 }
             }
         }
     }
+
+    private List<String> getLngAndLat(Context context) {
+        List<String> list = new ArrayList<>();
+        double latitude = 0;
+        double longitude = 0;
+        LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {  //从gps获取经纬度
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                    != PackageManager.PERMISSION_GRANTED
+                    &&
+                    ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+                    != PackageManager.PERMISSION_GRANTED) {
+                return new ArrayList<>();
+            }
+            Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            if (location != null) {
+                latitude = location.getLatitude();
+                longitude = location.getLongitude();
+                list.add("定位方式：GPS");
+            } else {//当GPS信号弱没获取到位置的时候又从网络获取
+                return getLngAndLatWithNetwork();
+            }
+        } else {    //从网络获取经纬度
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                return new ArrayList<>();
+            }
+            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000, 0, locationListener);
+            Location location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            if (location != null) {
+                latitude = location.getLatitude();
+                longitude = location.getLongitude();
+                list.add("定位方式：网络");
+            }
+        }
+        list.add("纬度：" + latitude +'\n');
+        list.add("经度：" + longitude+"\n");
+        return list;
+    }
+
+    //从网络获取经纬度
+    public List<String> getLngAndLatWithNetwork() {
+        List<String> list = new ArrayList<>();
+        list.add("定位方式：网络");
+        double latitude = 0.0;
+        double longitude = 0.0;
+        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return new ArrayList<>();
+        }
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000, 0, locationListener);
+        Location location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        if (location != null) {
+            latitude = location.getLatitude();
+            longitude = location.getLongitude();
+        }
+        list.add("纬度：" + latitude +'\n');
+        list.add("经度：" + longitude+"\n");
+        return list;
+    }
+
+    private final LocationListener locationListener = new LocationListener() {
+
+        @Override
+        public void onLocationChanged(Location location) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void onProviderDisabled(String arg0) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void onProviderEnabled(String arg0) {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void onStatusChanged(String arg0, int arg1, Bundle arg2) {
+            // TODO Auto-generated method stub
+
+        }
+
+    };
 
     public class MyLocationListener implements BDLocationListener{
 
@@ -173,16 +278,14 @@ public class MainActivity extends AppCompatActivity {
                     }
                     locationInfo = currentPosition.toString();
                     locationTv.setText(currentPosition);
-
-                    isSendEnable = false;
                 }
             });
         }
     }
 
     private void sendSMSS(String phoneNumber) {
-        String content = locationTv.getText().toString();
-        String phone = phoneNumber;
+        String content = locationTv.getText().toString().trim();
+        String phone = phoneNumber.trim();
         if (!content.isEmpty()&&!phone.isEmpty()) {
             SmsManager manager = SmsManager.getDefault();
             ArrayList<String> strings = manager.divideMessage(content);
